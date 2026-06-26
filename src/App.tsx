@@ -1,9 +1,40 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Component } from 'react'
+import type { ReactNode, ErrorInfo } from 'react'
 import { useAuthStore } from './store/authStore'
 import { signInWithGoogle, signOutUser } from './firebase/auth'
 import LogTab from './components/LogTab'
 import DashboardTab from './components/DashboardTab'
 import ConfigTab from './components/ConfigTab'
+
+// ── Error boundary for LogTab ─────────────────────────────────────────────────
+class LogErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; message: string }
+> {
+  state = { hasError: false, message: '' }
+  static getDerivedStateFromError(e: Error) { return { hasError: true, message: e.message } }
+  componentDidCatch(e: Error, info: ErrorInfo) { console.error('[LogTab crash]', e, info.componentStack) }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-8 text-center bg-[#0D1117]">
+          <div className="text-4xl select-none">⚠️</div>
+          <p className="text-[#E6EDF3] font-bold text-lg">Daily Log encountered an error</p>
+          <code className="text-[#8B98A9] text-xs font-mono bg-[#151B23] border border-[#2A3340] px-4 py-2 rounded-xl max-w-md break-all">
+            {this.state.message}
+          </code>
+          <button
+            onClick={() => this.setState({ hasError: false, message: '' })}
+            className="mt-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors text-sm"
+          >
+            Try Again
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 type Tab = 'dashboard' | 'log' | 'config'
 
@@ -187,8 +218,12 @@ function App() {
       {/* ── MAIN CONTENT ───────────────────────────────────────────────────── */}
       <div className="md:ml-[220px]">
         <div className="pb-16 md:pb-0">
-          {activeTab === 'dashboard' && <DashboardTab userEmail={user.email || ''} onSignOut={signOutUser} />}
-          {activeTab === 'log' && <LogTab userEmail={user.email || ''} onSignOut={signOutUser} dark={dark} onToggleDark={toggleDark} />}
+          {activeTab === 'dashboard' && <DashboardTab userEmail={user.email || ''} onSignOut={signOutUser} dark={dark} onToggleDark={toggleDark} />}
+          {activeTab === 'log' && (
+            <LogErrorBoundary>
+              <LogTab userEmail={user.email || ''} onSignOut={signOutUser} dark={dark} onToggleDark={toggleDark} />
+            </LogErrorBoundary>
+          )}
           {activeTab === 'config' && <ConfigTab userEmail={user.email || ''} onSignOut={signOutUser} />}
         </div>
       </div>

@@ -257,3 +257,88 @@
 - `src/components/DashboardTab.tsx`: renamed `userEmail` → `userEmail: _userEmail` in destructuring
 - `src/components/LogTab.tsx`: removed unused `IcoCopy` icon; renamed `onSignOut` → `onSignOut: _onSignOut`; removed unused `logSameAsLast` function
 - `npx tsc --noEmit` passes with zero errors
+
+---
+
+## Session 26-06-2026 | 19:20 → 20:30 IST
+
+### Changes Made:
+- `src/components/DashboardTab.tsx`: Full rewrite — complete maximalist dashboard with 8 sections
+- `src/App.tsx`: Added `dark={dark} onToggleDark={toggleDark}` props to DashboardTab
+
+### New Features:
+- **S1 Hero Header**: gradient background (dark: navy-to-indigo, light: white-to-blue/purple), greeting by time of day ("Good morning/afternoon/evening, Ravindra"), today's long date, 4 floating badge stat cards (Activities Today, Time Logged Today, Currently Running, Days Logged Total) in the exact badge cut-out ring pattern from LogTab; 2×2 mobile / 4×1 desktop
+- **S2 Live Activities**: amber glow banner section, only rendered when `running.length > 0`; live elapsed clock via 1s tick; Main/Parallel chip; matching LogTab running-banner styles
+- **S3 Donut Chart**: Recharts PieChart with `innerRadius=65 outerRadius=100`, time distribution by category, custom palette (8 colors via `getCategoryColor`), center overlay showing total duration, legend with duration + % per category, custom styled tooltip
+- **S4 Timeline Bar Chart**: 24-hour x-axis (12AM→11PM), duration in minutes y-axis, each bar colored by most-frequent category in that hour, dark/light themed CartesianGrid + axes + tooltip
+- **S5 Category Table**: sortable columns (Count / Total Time / Avg) with ↑↓ indicators; color dot per category; progress bar in Total Time column; alternating row stripes
+- **S6 7-Day Heatmap**: last 7 days as card grid, color intensity (grey → light/mid/dark green) by activity count, today highlighted with blue tint + "Today" label, activity count badge per day
+- **S7 Records**: streak (🔥 days), longest activity (trophy icon + duration + category), top category (tag icon + count), all-time duration (database icon); each in accent-colored pill background
+- **S8 Recent Feed**: last 10 activities across all days, date key + category + subcategory + type chip + duration, alternating stripes, "Switch to Log tab" footer
+- **Mobile header**: sticky, shows "Dashboard" title + dark/light toggle button (hidden on desktop)
+- Installs recharts (already installed from prior session); zero TypeScript errors after implementation
+
+### Current Status:
+- Auth ✅ | Daily Log ✅ | Dashboard ✅ | Config 🔲 | Firestore 🔲 | PWA manifest 🔲
+
+### Next Steps:
+- Firestore sync (LocalActivity → Firestore on add/edit/delete)
+- Config tab (categories, sync settings, export)
+- PWA manifest + icons
+- Workbox offline support
+
+---
+
+## Session 26-06-2026 | 20:30 → 21:00 IST
+
+### Changes Made:
+- `src/components/LogTab.tsx`: Refined detachable timer for cross-platform behavior
+
+### What Changed:
+- **Removed floating yellow timer bubble** — entire `FLOATING TIMER WIDGET` block deleted (yellow FAB + expandable panel with Dock/Undock); `timerOpen`, `timerDocked`, `timerFreePos`, `timerDragRef` state/refs removed
+- **Removed mobile header clock button** — the amber clock icon with running count badge that toggled the widget is gone
+- **Detach buttons hidden on touch/mobile** — both the running banner detach button and activity card detach button now use `hidden md:flex` so they only render on ≥768px (desktop) screens
+- **Desktop popup timer unchanged** — `buildPopupHtml`, `detachTimer`, `restoreTimer`, `floatingIds`, popup lifecycle (BroadcastChannel + closed-poll interval) all preserved exactly; still triggered only by explicit button click
+
+### Current Status:
+- Auth ✅ | Daily Log ✅ | Dashboard ✅ | Config 🔲 | Firestore 🔲 | PWA manifest 🔲
+
+### Next Steps:
+- Firestore sync (LocalActivity → Firestore on add/edit/delete)
+- Config tab (categories, sync settings, export)
+- PWA manifest + icons
+- Workbox offline support
+
+---
+
+## Session 26-06-2026 | 21:00 → 21:30 IST
+
+### Bug Fix: White screen crash on mobile (LogTab swipe)
+
+#### Root Cause
+`onSwipeEnd` queued a React state updater that closed over `swipeRef` (a ref object), then **immediately nulled `swipeRef.current`** before the updater ran. React 18 batches state updates and flushes the batch *after* the event handler returns — by that point `swipeRef.current` was `null`, so `swipeRef.current!.id` inside the updater threw `TypeError: Cannot read properties of null (reading 'id')`. With no error boundary, the React tree unmounted and left a white screen.
+
+The same unsafe ref-in-updater pattern existed in `onSwipeMove` (lower-risk but still defensive to fix).
+
+#### Files Changed
+- `src/components/LogTab.tsx`
+  - **`onSwipeEnd`**: destructure `{ id, currentX, startX }` from `swipeRef.current` into local variables *before* nulling the ref and *before* calling `setSwipeOffset` — the updater now closes over stable local values, not a ref that may be null when the updater runs
+  - **`onSwipeMove`**: same defensive pattern — capture `{ id, startX }` before the updater closure
+  - **`detachTimer`**: wrap `new BroadcastChannel(...)` in a `typeof BroadcastChannel !== 'undefined'` guard so iOS Safari < 15.4 (which lacks BroadcastChannel) doesn't throw if the code path is ever reached
+- `src/App.tsx`
+  - Added `LogErrorBoundary` class component (React error boundary) that catches render-cycle errors from `<LogTab>`, logs to console, and shows a "Try Again" fallback UI instead of a blank screen
+  - Wrapped `<LogTab>` with `<LogErrorBoundary>` in the main content area
+
+#### Not Changed
+- All existing swipe, long-press, drag, detach, and popup timer functionality unchanged
+- All Tailwind/theme conventions preserved
+- No new packages installed
+
+### Current Status
+- Auth ✅ | Daily Log ✅ | Dashboard ✅ | Config 🔲 | Firestore 🔲 | PWA manifest 🔲
+
+### Next Steps
+- Firestore sync (LocalActivity → Firestore on add/edit/delete)
+- Config tab (categories, sync settings, export)
+- PWA manifest + icons
+- Workbox offline support

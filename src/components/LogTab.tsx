@@ -123,10 +123,6 @@ export default function LogTab({ userEmail, onSignOut: _onSignOut, dark, onToggl
   const [dragOverIdx, setDragOverIdx] = useState<number|null>(null)
   const [showCal, setShowCal] = useState(false)
   const [calMonth, setCalMonth] = useState({y:new Date().getFullYear(),m:new Date().getMonth()})
-  const [timerOpen, setTimerOpen] = useState(false)
-  const [timerDocked, setTimerDocked] = useState(true)
-  const [timerFreePos, setTimerFreePos] = useState({x:0,y:0})
-  const timerDragRef = useRef<{ox:number,oy:number,bx:number,by:number}|null>(null)
   const [floatingIds, setFloatingIds] = useState<Set<string>>(new Set())
   const winRefs = useRef<Record<string, Window | null>>({})
   const chanRefs = useRef<Record<string, BroadcastChannel>>({})
@@ -278,9 +274,11 @@ export default function LogTab({ userEmail, onSignOut: _onSignOut, dark, onToggl
     popup.document.close()
     winRefs.current[a.id] = popup
     setFloatingIds(prev => new Set([...prev, a.id]))
-    const ch = new BroadcastChannel(`dal-timer-${a.id}`)
-    ch.addEventListener('message', e => { if (e.data.type === 'restore') restoreTimer(a.id) })
-    chanRefs.current[a.id] = ch
+    if (typeof BroadcastChannel !== 'undefined') {
+      const ch = new BroadcastChannel(`dal-timer-${a.id}`)
+      ch.addEventListener('message', e => { if (e.data.type === 'restore') restoreTimer(a.id) })
+      chanRefs.current[a.id] = ch
+    }
     closedCheckers.current[a.id] = setInterval(() => {
       if (popup.closed) { clearInterval(closedCheckers.current[a.id]); delete closedCheckers.current[a.id]; restoreTimer(a.id) }
     }, 500)
@@ -298,14 +296,22 @@ export default function LogTab({ userEmail, onSignOut: _onSignOut, dark, onToggl
   const onSwipeStart = (e:React.TouchEvent, id:string) => { swipeRef.current={id,startX:e.touches[0].clientX,currentX:e.touches[0].clientX} }
   const onSwipeMove = (e:React.TouchEvent) => {
     if(!swipeRef.current) return
-    const dx = e.touches[0].clientX - swipeRef.current.startX
-    if(dx<0) { swipeRef.current.currentX=e.touches[0].clientX; setSwipeOffset(p=>({...p,[swipeRef.current!.id]:Math.max(dx,-120)})) }
+    // Capture id before entering the updater closure — swipeRef.current could be
+    // nulled by a concurrent touchend before the React updater actually runs.
+    const { id, startX } = swipeRef.current
+    const dx = e.touches[0].clientX - startX
+    if(dx<0) { swipeRef.current.currentX=e.touches[0].clientX; setSwipeOffset(p=>({...p,[id]:Math.max(dx,-120)})) }
   }
   const onSwipeEnd = () => {
     if(!swipeRef.current) return
-    const dx = swipeRef.current.currentX - swipeRef.current.startX
-    setSwipeOffset(p=>({...p,[swipeRef.current!.id]:dx<-80?-100:0}))
-    swipeRef.current=null
+    // Capture everything from the ref BEFORE nulling it and BEFORE the state
+    // updater — React batches updates and runs the updater after this handler
+    // returns, by which point swipeRef.current would already be null, causing
+    // a TypeError (`null.id`) that crashes the React tree.
+    const { id, currentX, startX } = swipeRef.current
+    const dx = currentX - startX
+    swipeRef.current = null
+    setSwipeOffset(p => ({...p, [id]: dx < -80 ? -100 : 0}))
   }
   const closeSwipe = (id:string) => setSwipeOffset(p=>({...p,[id]:0}))
 
@@ -511,13 +517,6 @@ export default function LogTab({ userEmail, onSignOut: _onSignOut, dark, onToggl
           <div className={`text-xs font-bold ${T.textFaint}`}>Daily Activity Log</div>
           <div className={`text-[10px] ${T.textFaint} truncate hidden sm:block`}>{userEmail}</div>
         </div>
-        {running.length > 0 && (
-          <button onClick={()=>setTimerOpen(o=>!o)}
-            className={`relative w-8 h-8 rounded-lg border ${dark?'border-amber-500/30 bg-amber-500/10':'border-amber-300 bg-amber-50'} flex items-center justify-center ${dark?'text-amber-400':'text-amber-600'}`}>
-            <IcoClock/>
-            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">{running.length}</span>
-          </button>
-        )}
         <button onClick={onToggleDark}
           className={`w-8 h-8 rounded-lg border ${T.border} ${T.cardInner} flex items-center justify-center ${T.textSub} hover:opacity-80 transition-opacity`}>
           {dark ? <IcoSun /> : <IcoMoon />}
@@ -633,7 +632,7 @@ export default function LogTab({ userEmail, onSignOut: _onSignOut, dark, onToggl
             <button
               onClick={() => floatingIds.has(a.id) ? restoreTimer(a.id) : detachTimer(a)}
               title={floatingIds.has(a.id) ? 'Restore timer' : 'Open as floating window'}
-              className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors border ${
+              className={`w-7 h-7 rounded-lg hidden md:flex items-center justify-center flex-shrink-0 transition-colors border ${
                 floatingIds.has(a.id)
                   ? (dark ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-blue-50 text-blue-500 border-blue-200')
                   : (dark ? 'bg-[#1B2330] border-[#2A3340] text-[#5C6878] hover:text-blue-400 hover:border-blue-400/50' : 'bg-white border-gray-200 text-gray-400 hover:text-blue-500 hover:border-blue-200')
@@ -842,7 +841,7 @@ export default function LogTab({ userEmail, onSignOut: _onSignOut, dark, onToggl
                         <button
                           onClick={e=>{e.stopPropagation(); floatingIds.has(a.id) ? restoreTimer(a.id) : detachTimer(a)}}
                           title={floatingIds.has(a.id) ? 'Restore timer to card' : 'Open as floating window'}
-                          className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
+                          className={`w-6 h-6 rounded-lg hidden md:flex items-center justify-center flex-shrink-0 transition-colors ${
                             floatingIds.has(a.id)
                               ? (dark ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-blue-50 text-blue-500 border border-blue-200')
                               : `${T.cardInner} border ${T.border} ${T.textFaint} hover:text-blue-400 hover:border-blue-400/50`
@@ -1018,50 +1017,6 @@ export default function LogTab({ userEmail, onSignOut: _onSignOut, dark, onToggl
           <button onClick={()=>{setInlineNoteId(menuAct.id);setInlineNoteText(menuAct.notes||'');setMenuId(null);setMenuPos(null)}} className={`w-full text-left px-4 py-2.5 text-sm ${T.textSub} hover:bg-green-500/10 hover:text-green-500 flex items-center gap-2.5 transition-colors`}><IcoNote/><span>Add Note</span></button>
           {!menuAct.groupId && <button onClick={()=>{setSelectMode(true);setSelected(new Set([menuAct.id]));setMenuId(null);setMenuPos(null)}} className={`w-full text-left px-4 py-2.5 text-sm ${T.textSub} hover:bg-purple-500/10 hover:text-purple-500 flex items-center gap-2.5 transition-colors`}><IcoLink/><span>Select to Group</span></button>}
           <button onClick={()=>handleDelete(menuAct.id)} className={`w-full text-left px-4 py-2.5 text-sm ${T.textSub} hover:bg-red-500/10 hover:text-red-500 flex items-center gap-2.5 transition-colors border-t ${T.border}`}><IcoTrash/><span>Delete</span></button>
-        </div>
-      )}
-
-      {/* ── FLOATING TIMER WIDGET ── */}
-      {running.length > 0 && (
-        <div
-          className={timerDocked ? 'fixed bottom-[5.5rem] md:bottom-6 right-4 z-[999]' : 'fixed z-[999]'}
-          style={timerDocked ? {} : {left:timerFreePos.x, top:timerFreePos.y}}
-          onMouseDown={e=>{
-            if(!timerDocked && timerOpen) {
-              timerDragRef.current={ox:timerFreePos.x,oy:timerFreePos.y,bx:e.clientX,by:e.clientY}
-              const onMove=(ev:MouseEvent)=>{if(!timerDragRef.current)return;setTimerFreePos({x:timerDragRef.current.ox+(ev.clientX-timerDragRef.current.bx),y:timerDragRef.current.oy+(ev.clientY-timerDragRef.current.by)})}
-              const onUp=()=>{document.removeEventListener('mousemove',onMove);document.removeEventListener('mouseup',onUp);timerDragRef.current=null}
-              document.addEventListener('mousemove',onMove)
-              document.addEventListener('mouseup',onUp)
-            }
-          }}
-        >
-          {!timerOpen ? (
-            <button onClick={()=>setTimerOpen(true)}
-              className="w-12 h-12 rounded-full bg-amber-500 hover:bg-amber-600 shadow-lg shadow-amber-500/40 flex flex-col items-center justify-center gap-0.5 transition-colors">
-              <IcoClock/>
-              <span className="text-[9px] font-bold text-white leading-none">{running.length}</span>
-            </button>
-          ) : (
-            <div className={`${T.surface} border ${T.border} rounded-2xl shadow-2xl w-64 overflow-hidden`}>
-              <div className={`flex items-center gap-2 px-3 py-2.5 border-b ${T.border} cursor-move`}>
-                <span className={`text-xs font-bold ${T.text} flex-1`}>Running ({running.length})</span>
-                <button onClick={()=>setTimerDocked(d=>!d)} className={`text-[10px] font-bold ${T.textFaint} hover:opacity-80 transition-opacity px-1`}>{timerDocked?'Undock':'Dock'}</button>
-                <button onClick={()=>setTimerOpen(false)} className={`text-[10px] font-bold ${T.textFaint} hover:text-red-400 transition-colors`}>✕</button>
-              </div>
-              <div className="p-2 space-y-1 max-h-48 overflow-y-auto">
-                {running.map(a=>(
-                  <div key={a.id} className={`${T.cardInner} border ${T.border} rounded-xl px-3 py-2`}>
-                    <div className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse flex-shrink-0"/>
-                      <span className={`text-xs font-medium ${T.textSub} flex-1 truncate`}>{a.category}{a.subcategory!=='No Status'?' › '+a.subcategory:''}</span>
-                      <span className={`font-mono text-xs font-bold tabular-nums ${dark?'text-amber-400':'text-amber-600'}`}>{fmtClock(Date.now()-a.startMs)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
