@@ -245,3 +245,15 @@
 - Dashboard tab
 - PWA manifest + icons
 - Workbox offline support
+
+---
+
+## Session 26-06-2026 | 19:15 → 19:20 IST
+
+### Bug Fix: Build errors fixed
+
+- Deleted `src/src/App.tsx` (stray duplicate) and removed the empty `src/src/` directory
+- `src/components/Dashboard.tsx`: removed unused `Activity` type import; renamed `tick` → `_tick`; removed unused `now` in `handleLogSubmit`; fixed `BottomSheet` destructuring (`dark: _dark`, `panelInner: _panelInner`, `selectCls: _selectCls`); fixed `ActivityFormFields` destructuring (`panelInner: _panelInner`)
+- `src/components/DashboardTab.tsx`: renamed `userEmail` → `userEmail: _userEmail` in destructuring
+- `src/components/LogTab.tsx`: removed unused `IcoCopy` icon; renamed `onSignOut` → `onSignOut: _onSignOut`; removed unused `logSameAsLast` function
+- `npx tsc --noEmit` passes with zero errors

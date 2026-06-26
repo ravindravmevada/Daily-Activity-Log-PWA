@@ -1,6 +1,6 @@
 interface Props { userEmail: string; onSignOut: () => void }
 
-export default function DashboardTab({ userEmail }: Props) {
+export default function DashboardTab({ userEmail: _userEmail }: Props) {
   return (
     <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
       <div className="text-center space-y-3 px-6">

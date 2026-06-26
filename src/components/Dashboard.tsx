@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import type { Activity } from '../types/activity'
 import { CATEGORIES, ACTIVITY_DONE_AT, ACTIVITY_LOGGED_FROM, ACTIVITY_LOGGED_VIA } from '../types/categories'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -77,7 +76,7 @@ export default function Dashboard({ userEmail, onSignOut }: Props) {
   const [dark, setDark] = useState(true)
   const [viewDate, setViewDate] = useState(todayKey())
   const [days, setDays] = useState<DayData>({})
-  const [tick, setTick] = useState(0)
+  const [_tick, setTick] = useState(0)
   const [toast, setToast] = useState('')
   const toastTimer = useRef<ReturnType<typeof setTimeout>|null>(null)
 
@@ -144,7 +143,6 @@ export default function Dashboard({ userEmail, onSignOut }: Props) {
   // ── log activity ──────────────────────────────────────────────────────────
   const handleLogSubmit = () => {
     const form = logForm
-    const now = Date.now()
     const existing = days[viewDate] || []
     const runningNow = existing.filter(a => a.endMs === null)
 
@@ -591,7 +589,7 @@ export default function Dashboard({ userEmail, onSignOut }: Props) {
 }
 
 // ─── bottom sheet wrapper ─────────────────────────────────────────────────────
-function BottomSheet({ title, onClose, dark, panel, panelInner, dim, selectCls, children }: {
+function BottomSheet({ title, onClose, dark: _dark, panel, panelInner: _panelInner, dim, selectCls: _selectCls, children }: {
   title: string; onClose: () => void; dark: boolean; panel: string; panelInner: string; dim: string; selectCls: string; children: React.ReactNode
 }) {
   return (
@@ -612,7 +610,7 @@ function BottomSheet({ title, onClose, dark, panel, panelInner, dim, selectCls, 
 }
 
 // ─── form fields ──────────────────────────────────────────────────────────────
-function ActivityFormFields({ form, setForm, selectCls, dim, dark, panelInner }: {
+function ActivityFormFields({ form, setForm, selectCls, dim, dark, panelInner: _panelInner }: {
   form: ReturnType<typeof initForm>
   setForm: React.Dispatch<React.SetStateAction<ReturnType<typeof initForm>>>
   selectCls: string; dim: string; dark: boolean; panelInner: string
