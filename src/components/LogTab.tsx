@@ -28,6 +28,7 @@ const IcoNote  = () => <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="no
 const IcoChevD = () => <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
 const IcoChevU = () => <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="18 15 12 9 6 15"/></svg>
 const IcoPlus  = () => <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+const IcoGroup = () => <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5z"/><path d="M2 12l10 5 10-5"/></svg>
 const IcoChevL = () => <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
 const IcoChevR = () => <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
 const IcoSun   = () => <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
@@ -96,6 +97,159 @@ tick();setInterval(tick,1000);
 ${SC}</body></html>`
 }
 
+// ── GroupAddPicker ────────────────────────────────────────────────────────────
+// Defined at module level for the same reason as InlineCatEdit: prevents
+// unmount/remount on the parent's 1s-tick re-renders so the select stays open.
+type GroupAddState = {
+  triggerId: string      // id of the card showing the picker
+  mode: 'create' | 'add'
+  cat: string            // inherited category
+  groupId: string        // new groupId (create) or existing groupId (add)
+  activityNumber: number
+  nextSubIndex: number   // subIndex to assign the new activity
+} | null
+
+interface GroupAddProps {
+  state: NonNullable<GroupAddState>
+  viewDate: string
+  dark: boolean
+  updateActivity: (date: string, id: string, patch: Partial<LocalActivity>) => void
+  addActivity: (date: string, act: LocalActivity) => void
+  onClose: () => void
+  showToast: (msg: string) => void
+  selectCls: string
+}
+function GroupAddPicker({ state, viewDate, dark, updateActivity, addActivity, onClose, showToast, selectCls }: GroupAddProps) {
+  const ref = useRef<HTMLDivElement>(null)
+  const subcats = CATEGORIES[state.cat] || ['No Status']
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent | TouchEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('touchstart', onDown, { passive: true })
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('touchstart', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [])
+
+  const commit = (subcat: string) => {
+    if (state.mode === 'create') {
+      updateActivity(viewDate, state.triggerId, { groupId: state.groupId, subIndex: 1 })
+    }
+    addActivity(viewDate, {
+      id: uid(), startMs: Date.now(), endMs: null,
+      category: state.cat, subcategory: subcat,
+      activityDoneAt: 'No Status', activityType: 'Main',
+      hasStartTimestamp: true, hasNotes: false, notes: '',
+      loggedFrom: 'Daily Activity Log Web App (PWA)',
+      loggedVia: 'Daily Activity Log Web App (PWA)',
+      groupId: state.groupId, activityNumber: state.activityNumber,
+      subIndex: state.nextSubIndex, notesStatus: 'undecided',
+    })
+    showToast(state.mode === 'create' ? 'Group created' : 'Activity added to group')
+    onClose()
+  }
+
+  return (
+    <div
+      ref={ref}
+      className="mt-2 space-y-1.5"
+      onClick={e => e.stopPropagation()}
+      onMouseDown={e => e.stopPropagation()}
+      onTouchStart={e => e.stopPropagation()}
+    >
+      <div className="flex items-center justify-between">
+        <span className={`text-[10px] font-bold tracking-wider ${dark ? 'text-purple-400' : 'text-purple-600'}`}>
+          ↳ #{state.activityNumber}.{state.nextSubIndex} · {state.cat}
+        </span>
+        <button onClick={onClose} className={`text-[10px] px-1 transition-colors ${dark ? 'text-[#5C6878] hover:text-red-400' : 'text-gray-400 hover:text-red-500'}`}>✕</button>
+      </div>
+      <select autoFocus onChange={e => { if (e.target.value) commit(e.target.value) }} className={selectCls}>
+        <option value="">Subcategory…</option>
+        {subcats.map(s => <option key={s} value={s}>{s}</option>)}
+      </select>
+    </div>
+  )
+}
+
+// ── InlineCatEdit ─────────────────────────────────────────────────────────────
+// Defined at module level so React identifies it by stable reference and re-renders
+// (not unmounts) on parent 1s-tick state changes — keeping the native select open.
+interface InlineCatProps {
+  a: LocalActivity
+  viewDate: string
+  inlineCat: string
+  setInlineCat: (c: string) => void
+  onClose: () => void
+  updateActivity: (date: string, id: string, patch: Partial<LocalActivity>) => void
+  showToast: (msg: string) => void
+  selectCls: string
+}
+function InlineCatEdit({ a, viewDate, inlineCat, setInlineCat, onClose, updateActivity, showToast, selectCls }: InlineCatProps) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent | TouchEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('touchstart', onDown, { passive: true })
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('touchstart', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, []) // empty deps — onClose/updateActivity are stable refs, effect only needed on mount
+
+  const subcats = CATEGORIES[inlineCat] || ['No Status']
+
+  const commit = (subcat: string) => {
+    updateActivity(viewDate, a.id, { category: inlineCat, subcategory: subcat })
+    showToast('Category updated')
+    onClose()
+  }
+
+  const onCatChange = (newCat: string) => {
+    const subs = CATEGORIES[newCat] || ['No Status']
+    if (subs.length === 1) {
+      // Single-subcategory category — commit immediately without showing subcategory picker
+      updateActivity(viewDate, a.id, { category: newCat, subcategory: subs[0] })
+      showToast('Category updated')
+      onClose()
+    } else {
+      setInlineCat(newCat)
+    }
+  }
+
+  return (
+    <div
+      ref={ref}
+      className="mt-1 space-y-1.5"
+      onClick={e => e.stopPropagation()}
+      onMouseDown={e => e.stopPropagation()}
+      onTouchStart={e => e.stopPropagation()}
+    >
+      <select autoFocus value={inlineCat} onChange={e => onCatChange(e.target.value)} className={selectCls}>
+        {Object.keys(CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
+      </select>
+      {subcats.length > 1 && (
+        <select onChange={e => { if (e.target.value) commit(e.target.value) }} className={selectCls}>
+          <option value="">↳ Subcategory…</option>
+          {subcats.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+      )}
+    </div>
+  )
+}
+
 interface Props { userEmail: string; onSignOut: () => void; dark: boolean; onToggleDark: () => void }
 
 export default function LogTab({ userEmail, onSignOut: _onSignOut, dark, onToggleDark }: Props) {
@@ -127,6 +281,9 @@ export default function LogTab({ userEmail, onSignOut: _onSignOut, dark, onToggl
   const winRefs = useRef<Record<string, Window | null>>({})
   const chanRefs = useRef<Record<string, BroadcastChannel>>({})
   const closedCheckers = useRef<Record<string, ReturnType<typeof setInterval>>>({})
+  const [inlineCatId, setInlineCatId] = useState<string | null>(null)
+  const [inlineCat, setInlineCat]     = useState<string>('No Status')
+  const [groupAddState, setGroupAddState] = useState<GroupAddState>(null)
 
   // persist activities
   useEffect(() => { try { const s = localStorage.getItem(STORAGE_KEY); if(s) setDays(JSON.parse(s)) } catch(e){} }, [])
@@ -215,7 +372,34 @@ export default function LogTab({ userEmail, onSignOut: _onSignOut, dark, onToggl
     showToast('Activity ended')
   }
 
+  const openInlineCat = (a: LocalActivity) => {
+    setGroupAddState(null)
+    setInlineCatId(a.id); setInlineCat(a.category)
+  }
+
+  const handleCreateGroup = (a: LocalActivity) => {
+    setInlineCatId(null)
+    setGroupAddState({
+      triggerId: a.id, mode: 'create', cat: a.category,
+      groupId: uid(), activityNumber: a.activityNumber, nextSubIndex: 2,
+    })
+    setMenuId(null); setMenuPos(null)
+  }
+
+  const handleAddToGroup = (a: LocalActivity) => {
+    setInlineCatId(null)
+    const grp = dayActs.filter(x => x.groupId === a.groupId)
+    const maxSub = Math.max(...grp.map(x => x.subIndex ?? 0))
+    setGroupAddState({
+      triggerId: a.id, mode: 'add', cat: a.category,
+      groupId: a.groupId!, activityNumber: a.activityNumber, nextSubIndex: maxSub + 1,
+    })
+    setMenuId(null); setMenuPos(null)
+  }
+
   const openEdit = (a:LocalActivity) => {
+    setInlineCatId(null)
+    setGroupAddState(null)
     setEditingId(a.id)
     setEditForm({category:a.category,subcategory:a.subcategory,activityDoneAt:a.activityDoneAt,activityType:a.activityType,hasStartTimestamp:a.hasStartTimestamp,hasNotes:a.hasNotes,notes:a.notes,loggedFrom:a.loggedFrom,loggedVia:a.loggedVia})
     setMenuId(null); setMenuPos(null); setShowEditSheet(true)
@@ -373,6 +557,7 @@ export default function LogTab({ userEmail, onSignOut: _onSignOut, dark, onToggl
   }
 
   const selCls = `w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 transition-colors ${T.select}`
+  const inlineSelCls = `w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 transition-colors ${T.select}`
 
   // ── sub-components ────────────────────────────────────────────────────────────
   const TypeChips = ({ a }: { a: LocalActivity }) => (
@@ -849,21 +1034,56 @@ export default function LogTab({ userEmail, onSignOut: _onSignOut, dark, onToggl
                           <IcoDetach/>
                         </button>
                       )}
-                      {!selectMode && (
+                      {!selectMode && (<>
+                        <button
+                          onClick={e => { e.stopPropagation(); handleCreateGroup(a) }}
+                          className={`h-7 px-2.5 rounded-lg flex items-center gap-1.5 text-[10px] font-bold flex-shrink-0 border transition-colors ${
+                            dark ? 'border-purple-500/40 text-purple-400 bg-purple-500/10 hover:bg-purple-500/20'
+                                 : 'border-purple-300 text-purple-600 bg-purple-50 hover:bg-purple-100'
+                          }`}
+                        >
+                          <IcoGroup/><span>Group</span>
+                        </button>
                         <div className="relative flex-shrink-0">
-                          <button onClick={e=>{e.stopPropagation();if(menuId===a.id){setMenuId(null);setMenuPos(null)}else{const r=(e.currentTarget as HTMLElement).getBoundingClientRect();setMenuPos({top:r.bottom+4,right:window.innerWidth-r.right});setMenuId(a.id)}}}
+                          <button onClick={e=>{e.stopPropagation();setInlineCatId(null);if(menuId===a.id){setMenuId(null);setMenuPos(null)}else{const r=(e.currentTarget as HTMLElement).getBoundingClientRect();setMenuPos({top:r.bottom+4,right:window.innerWidth-r.right});setMenuId(a.id)}}}
                             className={`w-7 h-7 rounded-lg ${T.cardInner} border ${T.border} flex items-center justify-center ${T.textSub} hover:opacity-80 transition-opacity`}>
                             <IcoDots/>
                           </button>
                         </div>
+                      </>)}
+                    </div>
+
+                    {/* row 2: category — click to edit inline */}
+                    <div className="mt-3">
+                      {inlineCatId === a.id ? (
+                        <InlineCatEdit
+                          a={a} viewDate={viewDate}
+                          inlineCat={inlineCat} setInlineCat={setInlineCat}
+                          onClose={() => setInlineCatId(null)}
+                          updateActivity={updateActivity} showToast={showToast}
+                          selectCls={inlineSelCls}
+                        />
+                      ) : (
+                        <button
+                          onClick={e => { e.stopPropagation(); openInlineCat(a) }}
+                          className="group text-left max-w-full hover:opacity-75 transition-opacity"
+                        >
+                          <span className={`font-bold text-base ${T.text}`}>{a.category}</span>
+                          {a.subcategory !== 'No Status' && <span className={`text-sm ${T.textSub} ml-1`}>› {a.subcategory}</span>}
+                          <span className={`ml-1.5 text-[10px] ${T.textFaint} opacity-0 group-hover:opacity-70 transition-opacity`}>✎</span>
+                        </button>
                       )}
                     </div>
 
-                    {/* row 2: category */}
-                    <div className="mt-3">
-                      <span className={`font-bold text-base ${T.text}`}>{a.category}</span>
-                      {a.subcategory!=='No Status' && <span className={`text-sm ${T.textSub} ml-1`}>› {a.subcategory}</span>}
-                    </div>
+                    {/* group add picker — shown when "Create Group" opens from this solo card */}
+                    {groupAddState?.triggerId === a.id && (
+                      <GroupAddPicker
+                        state={groupAddState} viewDate={viewDate} dark={dark}
+                        updateActivity={updateActivity} addActivity={addActivity}
+                        onClose={() => setGroupAddState(null)}
+                        showToast={showToast} selectCls={inlineSelCls}
+                      />
+                    )}
 
                     {/* row 3: timestamps */}
                     <div className="mt-2 space-y-1">
@@ -959,17 +1179,53 @@ export default function LogTab({ userEmail, onSignOut: _onSignOut, dark, onToggl
                             <span className={`font-mono text-xs font-bold ml-auto tabular-nums ${isRunning?isMain?'text-blue-500':'text-amber-500':'text-green-500'}`}>
                               {isRunning?fmtClock(elapsed):fmtDur(elapsed)}
                             </span>
-                            {!selectMode && (
+                            {!selectMode && (<>
+                              <button
+                                onClick={e => { e.stopPropagation(); handleAddToGroup(a) }}
+                                className={`h-6 px-2 rounded-lg flex items-center gap-1 text-[9px] font-bold flex-shrink-0 border transition-colors ${
+                                  dark ? 'border-purple-500/40 text-purple-400 bg-purple-500/10 hover:bg-purple-500/20'
+                                       : 'border-purple-300 text-purple-600 bg-purple-50 hover:bg-purple-100'
+                                }`}
+                              >
+                                <IcoPlus/><span>Add</span>
+                              </button>
                               <div className="relative">
-                                <button onClick={e=>{e.stopPropagation();if(menuId===a.id){setMenuId(null);setMenuPos(null)}else{const r=(e.currentTarget as HTMLElement).getBoundingClientRect();setMenuPos({top:r.bottom+4,right:window.innerWidth-r.right});setMenuId(a.id)}}}
+                                <button onClick={e=>{e.stopPropagation();setInlineCatId(null);if(menuId===a.id){setMenuId(null);setMenuPos(null)}else{const r=(e.currentTarget as HTMLElement).getBoundingClientRect();setMenuPos({top:r.bottom+4,right:window.innerWidth-r.right});setMenuId(a.id)}}}
                                   className={`w-6 h-6 rounded-lg flex items-center justify-center ${T.textFaint} hover:opacity-80`}><IcoDots/></button>
                               </div>
-                            )}
+                            </>)}
                           </div>
                           <div className="mt-2">
-                            <span className={`font-bold text-sm ${T.text}`}>{a.category}</span>
-                            {a.subcategory!=='No Status' && <span className={`text-sm ${T.textSub} ml-1`}>› {a.subcategory}</span>}
+                            {inlineCatId === a.id ? (
+                              <InlineCatEdit
+                                a={a} viewDate={viewDate}
+                                inlineCat={inlineCat} setInlineCat={setInlineCat}
+                                onClose={() => setInlineCatId(null)}
+                                updateActivity={updateActivity} showToast={showToast}
+                                selectCls={inlineSelCls}
+                              />
+                            ) : (
+                              <button
+                                onClick={e => { e.stopPropagation(); openInlineCat(a) }}
+                                className="group text-left max-w-full hover:opacity-75 transition-opacity"
+                              >
+                                <span className={`font-bold text-sm ${T.text}`}>{a.category}</span>
+                                {a.subcategory !== 'No Status' && <span className={`text-sm ${T.textSub} ml-1`}>› {a.subcategory}</span>}
+                                <span className={`ml-1.5 text-[10px] ${T.textFaint} opacity-0 group-hover:opacity-70 transition-opacity`}>✎</span>
+                              </button>
+                            )}
                           </div>
+
+                          {/* group add picker — shown when "Add Activity" opens from this group member */}
+                          {groupAddState?.triggerId === a.id && (
+                            <GroupAddPicker
+                              state={groupAddState} viewDate={viewDate} dark={dark}
+                              updateActivity={updateActivity} addActivity={addActivity}
+                              onClose={() => setGroupAddState(null)}
+                              showToast={showToast} selectCls={inlineSelCls}
+                            />
+                          )}
+
                           <div className="mt-1.5 space-y-1">
                             {a.hasStartTimestamp && a.startMs>0 && (
                               <div className={`flex items-center gap-1.5 text-xs ${T.textFaint}`}>

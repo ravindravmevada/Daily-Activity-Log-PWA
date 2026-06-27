@@ -342,3 +342,223 @@ The same unsafe ref-in-updater pattern existed in `onSwipeMove` (lower-risk but 
 - Config tab (categories, sync settings, export)
 - PWA manifest + icons
 - Workbox offline support
+
+---
+
+## Session 26-06-2026 | 21:30 → 22:30 IST
+
+### Changes Made:
+- `CLAUDE.md`: Complete replacement — accurate versions from package.json, actual folder structure, all conventions, full feature list, orphaned file list, pitfall notes
+
+### New Features:
+- N/A — documentation-only session
+
+### Audit Findings:
+- Exact versions confirmed: React 19.2.7, TypeScript 6.0.2, Vite 8.1.0, Firebase 12.15.0, Zustand 5.0.14, Recharts 3.9.0, Tailwind 4.3.1
+- `Dashboard.tsx` and `AddActivityForm.tsx` are orphaned (not imported anywhere) — safe to delete
+- `App.css` is orphaned (not imported anywhere) — safe to delete
+- `src/assets/*` (hero.png, react.svg, vite.svg) are unused scaffold leftovers
+- `ACTIVITY_LOGGED_FROM` / `ACTIVITY_LOGGED_VIA` are the correct export names (not LOGGED_FROM/VIA)
+- `npx tsc --noEmit` passes with zero errors
+
+### Current Status:
+- Auth ✅ | Daily Log ✅ | Dashboard ✅ | Config 🔲 | Firestore 🔲 | PWA manifest 🔲
+
+### Next Steps:
+- Firestore sync (LocalActivity → Firestore on add/edit/delete)
+- Config tab (categories, sync settings, export)
+- PWA manifest + icons (192×192, 512×512)
+- Workbox offline support
+- Delete orphaned files: Dashboard.tsx, AddActivityForm.tsx, App.css, src/assets/*
+
+---
+
+## Session 27-06-2026 | 00:00 → 00:30 IST
+
+### Changes Made:
+- `src/App.tsx`: Collapsible desktop sidebar + mobile off-canvas drawer
+
+### New Features:
+- **Desktop collapsible sidebar**: toggle button (← chevron when expanded / ☰ hamburger when collapsed) in sidebar header; width animates between 220px and 64px via `transition-[width] duration-300 ease-in-out`; state persisted to `dal-sidebar` localStorage key
+- **Collapsed desktop sidebar**: icon-only mode — app name, nav labels, user email, and Sign Out text are hidden; icons remain visible and centered; active item shown with background tint (no border-l in collapsed mode)
+- **Tooltips on hover (desktop collapsed)**: custom Tailwind group-hover tooltips (`group/tip`) positioned `absolute left-full` next to each nav icon and the Sign Out icon; dark-themed (`bg-gray-900 text-white`), no native `title` delay
+- **Desktop header + content area**: margin-left transitions in sync with sidebar via `transition-[margin-left] duration-300 ease-in-out`; toggles between `ml-[220px]`/`md:ml-[220px]` and `ml-16`/`md:ml-16`
+- **Mobile off-canvas drawer**: slide-in from left (`-translate-x-full` → `translate-x-0`), 260px wide, full expanded layout (logo, nav labels, user + sign out); `transition-transform duration-300 ease-in-out`; backdrop overlay (`bg-black/50 backdrop-blur-sm`) closes on tap outside
+- **Mobile top bar**: new sticky `h-12` header (`md:hidden`) with hamburger (opens drawer), page title, and theme toggle; main content gets `pt-12 md:pt-0` to clear it
+- Mobile bottom nav preserved for quick tab switching without opening the drawer
+- Added `IcoMenu` (hamburger), `IcoChevronLeft`, `IcoX` (close) SVG icon components
+
+### Current Status:
+- Auth ✅ | Daily Log ✅ | Dashboard ✅ | Config 🔲 | Firestore 🔲 | PWA manifest 🔲 | Collapsible sidebar ✅
+
+### Next Steps:
+- Firestore sync (LocalActivity → Firestore on add/edit/delete)
+- Config tab (categories, sync settings, export)
+- PWA manifest + icons (192×192, 512×512)
+- Workbox offline support
+
+---
+
+## Session 27-06-2026 | 00:30 → 01:00 IST
+
+### Changes Made:
+- `src/components/LogTab.tsx`: Inline category/subcategory editing on activity cards
+
+### New Features:
+- **Clickable category title**: clicking the category/subcategory text on any activity card (solo or grouped) activates an inline editor directly within the card — no modal or edit form needed
+- **Category dropdown**: replaces the title text; pre-selected to the current category; uses existing `CATEGORIES` data source and `T.select` theme token
+- **Auto-commit for single-subcategory categories** (Food Intake, Room Tidying, etc.): selecting a category with only 'No Status' commits immediately with zero extra clicks
+- **Dependent subcategory dropdown**: appears only when the selected category has multiple subcategory options (9 categories total); selecting a subcategory commits and closes the editor instantly
+- **Pencil hint** (`✎`): appears on hover next to the category text via `group-hover:opacity-70`; invisible otherwise
+- **Outside click / Escape**: `InlineCatEdit` mounts a `mousedown` + `touchstart` + `keydown` handler on `document`; clicking outside or pressing Escape closes the editor without saving
+- **1s tick safety**: `InlineCatEdit` is defined at module level (not inside `LogTab`) so React identifies it by stable reference and re-renders in-place rather than unmounting/remounting it every second — the native `<select>` dropdown stays open across tick re-renders
+- **`inlineCat` in parent state**: the selected-category value lives in `LogTab` state (`inlineCat`/`setInlineCat`), not in the child component — survives parent re-renders without resetting
+- Inline editor closes when the ⋮ context menu opens, and when the Edit Activity sheet opens
+- All interactions use `stopPropagation` to prevent swipe, long-press, and drag from triggering during editing
+- Dark/light theme compatible via `inlineSelCls` (computed from `T.select`)
+
+### Current Status:
+- Auth ✅ | Daily Log ✅ | Dashboard ✅ | Config 🔲 | Firestore 🔲 | PWA manifest 🔲 | Collapsible sidebar ✅ | Inline cat edit ✅
+
+### Next Steps:
+- Firestore sync (LocalActivity → Firestore on add/edit/delete)
+- Config tab (categories, sync settings, export)
+- PWA manifest + icons (192×192, 512×512)
+- Workbox offline support
+
+---
+
+## Session 27-06-2026 | 01:00 → 01:30 IST
+
+### Changes Made:
+- `src/components/LogTab.tsx`: Contextual group actions ("Create Group" / "Add Activity") on activity cards
+
+### New Features:
+- **"Create Group" in ⋮ menu (solo activities):** clicking "Create Group" on a non-grouped activity opens an inline `GroupAddPicker` directly inside that card; the user selects a subcategory for the new companion activity and both are saved together — the original becomes #X.1 and the new one becomes #X.2, sharing a fresh `groupId`
+- **"Add Activity" in ⋮ menu (grouped activities):** clicking "Add Activity" on any group member opens the same `GroupAddPicker`; the new activity is appended as the next sub-number (#X.3, #X.4, …) by reading `maxSubIndex` across all current group members at the time of click
+- **`GroupAddPicker` module-level component:** defined outside `LogTab` (same reason as `InlineCatEdit`) so React re-renders it in-place on the parent's 1s-tick — the native `<select>` dropdown stays open across tick re-renders
+- **Category inheritance:** the new activity automatically inherits `category` from the triggering card; the user selects only subcategory — minimal clicks, no form required
+- **"Select to Group"** (multi-select manual grouping) is preserved alongside "Create Group" for solo cards
+- **`GroupAddState` type** holds: `triggerId`, `mode ('create'|'add')`, `cat`, `groupId`, `activityNumber`, `nextSubIndex` — computed once on open, stable for the lifetime of the picker
+- Outside click / Escape closes the picker without saving (same `document.mousedown` + `keydown` pattern as `InlineCatEdit`)
+- Opening `GroupAddPicker` closes `InlineCatEdit` and vice versa; opening the edit sheet closes both
+- Purple accent label (`↳ #X.Y · Category`) matches existing group card color scheme; adapts to dark/light via `dark` prop
+
+### Current Status:
+- Auth ✅ | Daily Log ✅ | Dashboard ✅ | Config 🔲 | Firestore 🔲 | PWA manifest 🔲 | Collapsible sidebar ✅ | Inline cat edit ✅ | Group create/add ✅
+
+### Next Steps:
+- Firestore sync (LocalActivity → Firestore on add/edit/delete)
+- Config tab (categories, sync settings, export)
+- PWA manifest + icons (192×192, 512×512)
+- Workbox offline support
+
+---
+
+## Session 27-06-2026 | 01:30 → 02:00 IST
+
+### Changes Made:
+- `src/components/LogTab.tsx`: Promoted group actions from overflow menu to primary quick buttons on activity cards
+
+### New Features:
+- **"Group" button on solo cards (row 1):** a compact purple pill (`[⧉] Group`, `h-7 px-2.5 rounded-lg`) sits between the detach button and the ⋮ menu at the right edge of the card — always visible, single tap, no menu required; calls `handleCreateGroup(a)` directly
+- **"Add" button on group member rows (row 1):** a slightly smaller purple pill (`[+] Add`, `h-6 px-2`) in the same position inside each group member — single tap creates the next activity in the group; calls `handleAddToGroup(a)` directly
+- **`IcoGroup` icon:** clean 2-layer stack SVG (`w-3.5 h-3.5`) added for the "Group" button; "Add" button reuses existing `IcoPlus`
+- **Removed from ⋮ menu:** "Create Group" and "Add Activity" are no longer in the overflow menu — "Select to Group" (multi-select manual grouping) is preserved there
+- Both buttons hidden in select mode (inside the `{!selectMode && (<>...</>)}` fragment guard)
+- Dark/light adaptive: purple token classes (`border-purple-500/40 text-purple-400 bg-purple-500/10` dark / `border-purple-300 text-purple-600 bg-purple-50` light) match existing group card accent color
+
+### Current Status:
+- Auth ✅ | Daily Log ✅ | Dashboard ✅ | Config 🔲 | Firestore 🔲 | PWA manifest 🔲 | Collapsible sidebar ✅ | Inline cat edit ✅ | Group create/add ✅ (primary quick action)
+
+### Next Steps:
+- Firestore sync (LocalActivity → Firestore on add/edit/delete)
+- Config tab (categories, sync settings, export)
+- PWA manifest + icons (192×192, 512×512)
+- Workbox offline support
+
+---
+
+## Session 27-06-2026 | 02:00 → 02:45 IST — Final Audit & CLAUDE.md Rewrite
+
+### Files Audited (full read):
+- `src/main.tsx` — StrictMode + createRoot, no changes needed
+- `src/index.css` — Tailwind v4 @import + Lexend font + @theme, no changes needed
+- `src/firebase/config.ts` — env-var-based Firebase init, exports `db`, `auth`, `app`
+- `src/firebase/auth.ts` — `signInWithGoogle`, `signOutUser`, `onAuthChange`
+- `src/store/authStore.ts` — Zustand: user/loading/initialized + initialize()
+- `src/store/activityStore.ts` — Zustand: days CRUD + groupActivities
+- `src/types/activity.ts` — `Activity` + `DailyLog` interfaces (Firestore schema, not yet used by UI)
+- `src/types/categories.ts` — CATEGORIES (9 keys), ACTIVITY_DONE_AT, ACTIVITY_LOGGED_FROM, ACTIVITY_LOGGED_VIA, ACTIVITY_TYPES
+- `src/utils/helpers.ts` — todayKey, dkey, keyToDate, fmtTS, fmtClock, fmtDur, uid, DOW, MON, pad
+- `src/components/ConfigTab.tsx` — placeholder; confirmed hardcoded dark-only styling (no `dark` prop, no T tokens)
+- `src/App.tsx` — collapsible sidebar + mobile drawer + bottom nav + auth gate + LogErrorBoundary
+- `src/components/LogTab.tsx` — full audit (~1280 lines): all inline features confirmed as built
+
+### TypeScript check:
+`npx tsc --noEmit` → **✅ Zero errors**
+
+### CLAUDE.md Rewrite — What Changed:
+- Added **Collapsible sidebar** section: SIDEBAR_KEY, sidebarExpanded, mobileOpen, width/margin classes, tooltip pattern, overflow-hidden placement, mobile overlay/drawer
+- Added **Module-level sub-components (1s-tick safety)** section — the critical pattern explaining WHY InlineCatEdit and GroupAddPicker must be defined outside LogTab
+- Added **Inline category editing** section: state, behavior, auto-commit logic, mutual-exclusion with GroupAddPicker
+- Added **Group creation and add-to-group** section: GroupAddState type, "Group" button on solo cards, "Add" button on group member rows, commit logic for both modes
+- Added **JSX fragment rule** pitfall
+- Added **1s-tick sub-component rule** and **GroupAddState snapshot** to Common pitfalls
+- Updated storage keys to include `dal-sidebar`
+- Updated folder structure: LogTab now ~1280 lines; App.tsx description updated
+- Corrected `pageBg` raw hex — it is in DashboardTab's T object only, not LogTab's
+- Noted ConfigTab known limitation (hardcoded dark-only, no T tokens)
+- Updated Completed ✅ list: collapsible sidebar, inline cat edit, Create Group, Add Activity quick actions
+- Updated Pending 🔲 list: added Config tab full rewrite note
+- Updated feature list in Daily Log section: inline category editing, Create Group / Add Activity quick actions documented
+
+### All Features Built (complete summary):
+
+**Auth & Shell:**
+- Google Sign-In via Firebase popup ✅
+- Auth gate (login screen until signed in) ✅
+- LogErrorBoundary with "Try Again" fallback ✅
+- Collapsible desktop sidebar (220px ↔ 64px icon-only, `dal-sidebar` persisted) ✅
+- Sidebar tooltips when collapsed (named group pattern `group/tip`) ✅
+- Mobile off-canvas drawer (260px, backdrop overlay, resize-close) ✅
+- Mobile top bar + bottom nav (3 tabs) ✅
+- Dark/light theme toggle (`dal-theme` persisted) ✅
+
+**Daily Log (LogTab.tsx):**
+- Date navigation: prev/next arrows, calendar popup, Today button ✅
+- Instant log: +Main Activity, +Parallel Activity (running immediately) ✅
+- Quick Log chips: 6 most-used categories, one-tap ✅
+- Full log form bottom-sheet: all fields ✅
+- Activity cards: drag handle, number badge, Main/Parallel type chips (tappable), timer/duration ✅
+- Running banners with live clock ✅
+- Swipe-left: End + Delete revealed (mobile) ✅
+- Inline category editing: click category text → select+select, auto-commit for single-subcategory ✅
+- Notes 3-state system: undecided → has-notes / none ✅
+- Create Group quick action: [⧉ Group] button on solo cards → #X.1 + #X.2 with subcategory picker ✅
+- Add Activity quick action: [+ Add] button on group member rows → appends #X.N ✅
+- Legacy multi-select grouping: long-press → select → Group (still available via "Select to Group" in ⋮ menu) ✅
+- Group cards: collapsed/expanded, total duration (Main only), running amber glow ✅
+- Drag-and-drop reorder (desktop) with activityNumber renumbering ✅
+- Floating timer popup (desktop only): window.open, BroadcastChannel restore, compact mode ✅
+- Stats cards: Logged / Running / Completed / Groups ✅
+- Toast notifications (2s/4s) with Undo for delete ✅
+- localStorage persistence (`dal-activities-v1`) ✅
+
+**Dashboard (DashboardTab.tsx):**
+- 8 sections: Hero, Live Activities, Donut Chart, Timeline Bar Chart, Category Table, 7-Day Heatmap, Records, Recent Feed ✅
+
+**Config (ConfigTab.tsx):**
+- Email display + sign-out + coming-soon placeholder ✅ (known: dark-only styling, needs rewrite)
+
+**Infrastructure:**
+- GitHub Actions CI/CD → Firebase Hosting (auto-deploy on push to main) ✅
+- Firebase Hosting (projectId: daily-activity-log-project) ✅
+
+### Next Steps:
+- Firestore sync (LocalActivity → Firestore on add/edit/delete)
+- Config tab full rewrite with dark/light theme + categories management + sync settings
+- PWA manifest + icons (192×192, 512×512)
+- Workbox offline support (service worker + IndexedDB queue)
+- Apps Script sync (Sheet ↔ Firestore)
+- Clean up orphaned files: Dashboard.tsx, AddActivityForm.tsx, App.css, src/assets/*
